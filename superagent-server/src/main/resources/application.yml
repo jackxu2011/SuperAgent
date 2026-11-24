@@ -40,6 +40,10 @@ superagent:
     codex:
       # Allow companies without a Codex key to use the server user's CLI login (shared across those companies).
       use-cli-login: true
+    claude:
+      # Allow companies without a Claude key to use the server user's `claude login` subscription (shared across those
+      # companies). Off by default: a personal Claude subscription is meant for one person, not a shared server.
+      use-cli-login: ${SUPERAGENT_CLAUDE_USE_CLI_LOGIN:false}
   registration:
     # Whether the sign-in page lets anyone register an organization. Turn it off once the organizations you want exist.
     enabled: ${SUPERAGENT_REGISTRATION_ENABLED:true}

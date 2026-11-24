@@ -109,16 +109,27 @@ public class ProviderProbe {
 
     /** Ask Codex itself, so its configured home and OS credential store are handled by the CLI. */
     public boolean codexLoggedIn() {
-        Optional<Path> binary = findBinary("codex");
+        return loginStatus("codex", List.of("login", "status"), List.of("CODEX_API_KEY", "OPENAI_API_KEY"));
+    }
+
+    /** Claude Code's own subscription login ({@code claude login}): {@code claude auth status} exits 0 when signed in. */
+    public boolean claudeLoggedIn() {
+        return loginStatus("claude", List.of("auth", "status"), List.of("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"));
+    }
+
+    /** Runs the CLI's login check without its key variables, so only the CLI's own login counts. */
+    private boolean loginStatus(String cli, List<String> args, List<String> keyVars) {
+        Optional<Path> binary = findBinary(cli);
         if (binary.isEmpty()) {
             return false;
         }
         try {
-            ProcessBuilder pb = new ProcessBuilder(binary.get().toString(), "login", "status")
+            List<String> cmd = new ArrayList<>(List.of(binary.get().toString()));
+            cmd.addAll(args);
+            ProcessBuilder pb = new ProcessBuilder(cmd)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD);
             pb.environment().put("PATH", String.join(File.pathSeparator, searchPath()));
-            pb.environment().remove("CODEX_API_KEY");
-            pb.environment().remove("OPENAI_API_KEY");
+            keyVars.forEach(pb.environment()::remove);
             Process process = pb.start();
             if (!process.waitFor(8, TimeUnit.SECONDS)) {
                 process.destroyForcibly();

@@ -78,7 +78,7 @@ class CredentialServiceTest {
     Path tmp;
 
     @Test
-    void codexMachineLoginIsOptInAndCompanyKeyTakesPriority() {
+    void machineLoginsAreOptInPerCliAndCompanyKeyTakesPriority() {
         InMemoryPool pool = new InMemoryPool();
         ModelProviderStore providers = mock(ModelProviderStore.class);
         when(providers.findByKey(anyString())).thenReturn(Optional.empty());
@@ -92,6 +92,12 @@ class CredentialServiceTest {
         assertThatThrownBy(() -> svc.current("claude")).isInstanceOf(CredentialService.NoCompanyKeyException.class);
         svc.add("codex", new CredentialRequests.Save("company", "", "test-company-key", false, null));
         assertThat(svc.current("codex").credential().apiKey()).isEqualTo("test-company-key");
+
+        // Claude Code's subscription login has its own switch, off unless turned on.
+        assertThat(svc.canChoose("claude")).isFalse();
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "claudeCliLogin", true);
+        assertThat(svc.canChoose("claude")).isTrue();
+        assertThat(svc.current("claude").credential()).isNull();
     }
 
     @Test

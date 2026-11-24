@@ -66,6 +66,8 @@ public class CredentialService {
     private final MachineCredentials machine; // null in tests: nothing to import
     @org.springframework.beans.factory.annotation.Value("${superagent.provider.codex.use-cli-login:false}")
     private boolean codexCliLogin;
+    @org.springframework.beans.factory.annotation.Value("${superagent.provider.claude.use-cli-login:false}")
+    private boolean claudeCliLogin;
     private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
     private final ExecutorService checker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "credential-check");
@@ -197,7 +199,11 @@ public class CredentialService {
     }
 
     boolean allowsCliLogin(String providerKey) {
-        return codexCliLogin && "codex".equals(providerKey);
+        return switch (providerKey) {
+            case "codex" -> codexCliLogin;
+            case "claude" -> claudeCliLogin;
+            default -> false;
+        };
     }
 
     boolean canChoose(String providerKey) {
