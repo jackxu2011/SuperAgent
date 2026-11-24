@@ -430,9 +430,7 @@ function beginRename(li, agent, nameEl) {
     const value = input.value.trim();
     if (save && value && value !== original) {
       try {
-        await api.updateAgent(agent.id, {
-          name: value, avatar: agent.avatar, character: agent.character, persona: agent.persona, model: agent.model,
-        });
+        await api.updateAgent(agent.id, { name: value }); // fields left out keep their values
         agent.name = value;
         span.textContent = value;
       } catch (e) { span.textContent = original; }

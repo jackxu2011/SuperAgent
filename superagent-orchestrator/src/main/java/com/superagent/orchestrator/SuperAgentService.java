@@ -679,9 +679,9 @@ public class SuperAgentService {
         requireApproved(owner);
         Agent a = member(owner, memberId);
         requireHealthyModel(model);
-        agents.update(a.id(), new UpdateAgentRequest(
-                name != null ? name : a.name(), persona != null ? persona : a.persona(),
-                model != null ? model : a.model(), null, persona != null ? null : a.character(), skillIds), owner);
+        // A new persona replaces the preset character too: "" switches the member to a custom one.
+        agents.update(a.id(), new UpdateAgentRequest(name, persona, model, null, persona != null ? "" : null, skillIds),
+                owner);
         logSuper(owner, "info", "调整成员「" + a.name() + "」", persona);
         return member(owner, memberId);
     }

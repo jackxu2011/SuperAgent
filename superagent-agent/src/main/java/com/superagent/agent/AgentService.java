@@ -245,17 +245,18 @@ public class AgentService {
     public AgentDto update(String id, UpdateAgentRequest request, String owner) {
         Agent agent = require(id, owner);
         String avatar = trimToNull(request.avatar()) == null ? agent.avatar() : validAvatar(request.avatar().trim());
+        String model = keepOrClear(request.model(), agent.model());
+        String tier = keepOrClear(request.tier(), agent.tier());
         Agent updated;
         if (agent.isSuper()) {
             // The leader's name and character are the platform's; only its look, model and skills are the user's.
-            updated = new Agent(agent.id(), agent.name(), avatar, null, null, trimToNull(request.model()),
-                    agent.status(), agent.owner(), agent.kind(), agent.managedBy(), agent.createdAt(), Instant.now());
+            updated = new Agent(agent.id(), agent.name(), avatar, null, null, model, agent.status(), agent.owner(),
+                    agent.kind(), agent.managedBy(), agent.createdAt(), Instant.now(), tier);
         } else {
             String name = request.name() == null || request.name().isBlank() ? agent.name() : request.name().trim();
-            // character is always sent by the edit form: null/blank switches the agent to a custom character.
-            updated = new Agent(agent.id(), name, avatar, validCharacter(trimToNull(request.character())),
-                    trimToNull(request.persona()), trimToNull(request.model()), agent.status(), agent.owner(),
-                    agent.kind(), agent.managedBy(), agent.createdAt(), Instant.now());
+            updated = new Agent(agent.id(), name, avatar, validCharacter(keepOrClear(request.character(), agent.character())),
+                    keepOrClear(request.persona(), agent.persona()), model, agent.status(), agent.owner(),
+                    agent.kind(), agent.managedBy(), agent.createdAt(), Instant.now(), tier);
         }
         store.update(updated);
         if (request.skillIds() != null) {
@@ -266,7 +267,7 @@ public class AgentService {
 
     /**
      * Merge-update from a chat tool: only the fields the caller passed are touched, the rest keep their value
-     * (unlike {@link #update}, which blanks persona/model/character when they are null). {@code skillIds} null keeps
+     * (as in {@link #update}). {@code skillIds} null keeps
      * the bound skills; a list (empty or not) replaces them. A SuperAgent's name and character are platform-fixed and
      * never change; if that's all the request wanted, nothing is written and a notice is returned.
      *
@@ -290,15 +291,7 @@ public class AgentService {
         if (!effective) {
             return "SuperAgent 的名称和性格是平台固定的，不能修改。";
         }
-        // Fill the blanks with the current values so update's overwrite semantics leave them alone.
-        UpdateAgentRequest req = new UpdateAgentRequest(
-                wantsName ? name.trim() : agent.name(),
-                wantsPersona ? persona : agent.persona(),
-                wantsModel ? model : agent.model(),
-                agent.avatar(),
-                wantsCharacter ? character : agent.character(),
-                skillIds, null);
-        AgentDto dto = update(id, req, owner);
+        AgentDto dto = update(id, new UpdateAgentRequest(name, persona, model, null, character, skillIds, null), owner);
         List<String> changed = new ArrayList<>();
         if (wantsName && !agent.isSuper() && !Objects.equals(agent.name(), dto.name())) changed.add("名称");
         if (wantsCharacter && !agent.isSuper() && !Objects.equals(agent.character(), dto.character())) changed.add("性格");
@@ -360,6 +353,11 @@ public class AgentService {
 
     private static String trimToNull(String s) {
         return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    /** An update's field: null (left out) keeps the current value, blank clears it. */
+    private static String keepOrClear(String sent, String current) {
+        return sent == null ? current : trimToNull(sent);
     }
 
     private AgentDto toDto(Agent a, String sessionId, String viewer) {
