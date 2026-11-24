@@ -34,6 +34,13 @@ cp "$jar" "$copy"
 # Older copies go; an instance still running from one keeps its open file.
 ls -1t "$RUN_DIR"/superagent-*.jar | tail -n +"$((KEEP + 1))" | while read -r old; do rm -f "$old"; done
 
+if [ -f "$RUN_DIR/superagent.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$RUN_DIR/superagent.env"
+  set +a
+fi
+
 cd "$ROOT/superagent-server"
 echo "Running $copy"
 # shellcheck disable=SC2086
