@@ -1848,18 +1848,22 @@ public class TaskService implements TaskRecovery {
     /** {@code label}: what the turn is, for its timing (a coding phase's key), or null. */
     private TurnResult executeTurn(Task task, String prompt, String agentSessionId, boolean sessionFirstTurn,
                                    boolean wrapBriefPrompt, Runnable onToolUse, Cancellation cancellation, String label) {
-        return executeTurn(task, prompt, agentSessionId, sessionFirstTurn, wrapBriefPrompt, onToolUse, cancellation, label, false);
+        return executeTurn(task, prompt, agentSessionId, sessionFirstTurn, wrapBriefPrompt, onToolUse, cancellation, label,
+                false, false);
     }
 
-    /** {@code readOnly}: a turn that only judges (an independent check): read-only tools, no file, MCP or connector tools. */
+    /**
+     * {@code readOnly}: read-only tools, no file, MCP or connector tools. {@code independentCheck}: a turn that judges
+     * the work (review, acceptance, checks): it runs without the doer's identity and memory, so it doesn't speak for the doer.
+     */
     private TurnResult executeTurn(Task task, String prompt, String agentSessionId, boolean sessionFirstTurn,
                                    boolean wrapBriefPrompt, Runnable onToolUse, Cancellation cancellation, String label,
-                                   boolean readOnly) {
+                                   boolean readOnly, boolean independentCheck) {
         com.superagent.core.timing.TurnTimer timer = new com.superagent.core.timing.TurnTimer();
         String turnId = UUID.randomUUID().toString();
         try {
             return timedTurn(task, prompt, agentSessionId, sessionFirstTurn, wrapBriefPrompt, onToolUse, cancellation,
-                    timer, turnId, readOnly);
+                    timer, turnId, readOnly, independentCheck);
         } finally {
             if (timings != null) {
                 try {
@@ -1873,7 +1877,8 @@ public class TaskService implements TaskRecovery {
 
     private TurnResult timedTurn(Task task, String prompt, String agentSessionId, boolean sessionFirstTurn,
                                  boolean wrapBriefPrompt, Runnable onToolUse, Cancellation cancellation,
-                                 com.superagent.core.timing.TurnTimer timer, String messageId, boolean readOnly) {
+                                 com.superagent.core.timing.TurnTimer timer, String messageId, boolean readOnly,
+                                 boolean independentCheck) {
         AgentRunner runner = runners.get(task.agentType());
         if (runner == null) {
             throw new IllegalStateException("No runner for agent type " + task.agentType());
@@ -1939,7 +1944,7 @@ public class TaskService implements TaskRecovery {
                         : sessionFirstTurn ? wrapBrief(task, prompt) : NEW_TASK_NOTE + "\n\n" + wrapBrief(task, prompt),
                 effectiveModel(task),
                 tools, skipPermissions && !readOnly, McpGrants.withServers(grant == null ? null : mcpGrants.mcpConfig(grant), connected),
-                taskSystemPrompt(task, grant != null),
+                taskSystemPrompt(task, grant != null, independentCheck),
                 nextTurnImages.remove(task.id()), null, choice.credential());
         try {
             timer.attemptStarted();
@@ -2171,7 +2176,7 @@ public class TaskService implements TaskRecovery {
         harness.drive(new com.superagent.task.harness.HarnessRun(harnessHost, working, state, reply, cancellation));
     }
 
-    private final com.superagent.task.harness.HarnessHost harnessHost = new com.superagent.task.harness.HarnessHost() {
+    final com.superagent.task.harness.HarnessHost harnessHost = new com.superagent.task.harness.HarnessHost() {
         @Override
         public Turn turn(Task task, String prompt, String conversation, boolean first, String label, Cancellation c) {
             if (shuttingDown) {
@@ -2188,7 +2193,7 @@ public class TaskService implements TaskRecovery {
             Task on = model == null || !runners.containsKey(AgentType.fromString(model.cli())) ? task
                     : task.withModel(model.model(), AgentType.fromString(model.cli()), task.tier());
             // It judges what it's shown: it may read, never change the work or reach out (files, MCP, connectors).
-            TurnResult r = executeTurn(on, prompt, conversation, true, false, null, c, label, true);
+            TurnResult r = executeTurn(on, prompt, conversation, true, false, null, c, label, true, true);
             addSpend(task.id(), r.cost());
             return new Turn(r.finalText(), r.cost(), r.cancelled());
         }
@@ -2349,7 +2354,14 @@ public class TaskService implements TaskRecovery {
         public Turn reviewTurn(Task task, Model model, String prompt, String conversation, String label, Cancellation c) {
             AgentType type = model == null || model.cli() == null ? null : AgentType.fromString(model.cli());
             Task on = type == null || !runners.containsKey(type) ? task : task.withModel(model.model(), type, task.tier());
-            return turn(on, prompt, conversation, true, label, c);
+            if (shuttingDown) {
+                markInterrupted(task.id());
+                return new Turn(null, BigDecimal.ZERO, true);
+            }
+            // Same tools as a working turn (it may run the checks); only the doer's identity and memory are left out.
+            TurnResult r = executeTurn(on, prompt, conversation, true, false, null, c, label, false, true);
+            addSpend(on.id(), r.cost());
+            return new Turn(r.finalText(), r.cost(), r.cancelled());
         }
 
         @Override
@@ -2624,9 +2636,10 @@ public class TaskService implements TaskRecovery {
     }
 
     /** The task's skills index, plus how to hand over files when the run has the file tools. */
-    private String taskSystemPrompt(Task task, boolean withTools) {
+    private String taskSystemPrompt(Task task, boolean withTools, boolean independentCheck) {
         String index = skills == null ? null : skills.install(task.workspaceDir(), skills.forTask(task.id(), task.createdBy()), withTools);
-        String prompt = join(join(doerPrompt(task), projectPrompt(task)), index);
+        String doer = independentCheck ? null : doerPrompt(task); // a checker judges as itself, not as the doer
+        String prompt = join(join(doer, projectPrompt(task)), index);
         return withToolRules(join(prompt, styleGuidePrompt(task)), withTools);
     }
 
