@@ -162,8 +162,12 @@ public class McpClient {
         } catch (IOException e) {
             // A server that exits before reading its first request closes the pipe; reporting
             // "Stream closed" hides the exit code that explains what actually happened.
-            if (!p.isAlive()) {
-                throw new IOException("MCP 服务启动后就退出了（退出码 " + p.exitValue() + "）", e);
+            try {
+                if (p.waitFor(1, TimeUnit.SECONDS)) {
+                    throw new IOException("MCP 服务启动后就退出了（退出码 " + p.exitValue() + "）", e);
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
             }
             throw e;
         }

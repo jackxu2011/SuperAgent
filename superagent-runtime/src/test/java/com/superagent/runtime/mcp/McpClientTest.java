@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -25,6 +27,86 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class McpClientTest {
 
     private final McpClient client = new McpClient();
+
+    @Test
+    void stdioImmediatelyExitedServerReportsExitCode(@TempDir Path dir) throws IOException {
+        Path server = dir.resolve("exit.sh");
+        Files.writeString(server, "#!/bin/sh\nexit 3\n");
+        server.toFile().setExecutable(true);
+        assertThatThrownBy(() -> client.listTools(new McpServerSpec("x", ConnectorTransport.STDIO, null, Map.of(),
+                server.toString(), List.of(), Map.of()), Duration.ofSeconds(10))).hasMessageContaining("退出码 3");
+    }
+
+    @Test
+    void stdioClosedInputThenDelayedExitReportsExitCode(@TempDir Path dir) throws IOException {
+        Path server = dir.resolve("closed-input.sh");
+        Files.writeString(server, """
+                #!/bin/sh
+                read line
+                exec 0<&-
+                echo '{"jsonrpc":"2.0","id":1,"result":{}}'
+                sleep 0.3
+                exit 3
+                """);
+        server.toFile().setExecutable(true);
+        assertThatThrownBy(() -> client.listTools(new McpServerSpec("x", ConnectorTransport.STDIO, null, Map.of(),
+                server.toString(), List.of(), Map.of()), Duration.ofSeconds(10)))
+                .hasMessageContaining("退出码 3").hasCauseInstanceOf(IOException.class);
+    }
+
+    @Test
+    void failedWriteReportsDelayedExitAndOriginalCause() throws Exception {
+        Process process = new ProcessBuilder("sh", "-c", "sleep 0.3; exit 3").start();
+        IOException failure = new IOException("Broken pipe");
+        try {
+            assertThatThrownBy(() -> sendWithFailure(process, failure))
+                    .hasMessageContaining("退出码 3").hasCause(failure);
+        } finally {
+            process.destroyForcibly();
+        }
+    }
+
+    @Test
+    void failedWriteRethrowsOriginalWhenProcessRemainsAlive() throws Exception {
+        Process process = new ProcessBuilder("sh", "-c", "exec sleep 10").start();
+        IOException failure = new IOException("Broken pipe");
+        try {
+            assertThatThrownBy(() -> sendWithFailure(process, failure)).isSameAs(failure);
+            assertThat(process.isAlive()).isTrue();
+        } finally {
+            process.destroyForcibly();
+        }
+    }
+
+    @Test
+    void interruptedWaitRestoresInterruptAndRethrowsWriteFailure() throws Exception {
+        Process process = new ProcessBuilder("sh", "-c", "exec sleep 10").start();
+        IOException failure = new IOException("Broken pipe");
+        try {
+            Thread.currentThread().interrupt();
+            assertThatThrownBy(() -> sendWithFailure(process, failure)).isSameAs(failure);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+            process.destroyForcibly();
+        }
+    }
+
+    private void sendWithFailure(Process process, IOException failure) throws Throwable {
+        OutputStream out = new OutputStream() {
+            @Override
+            public void write(int b) throws IOException {
+                throw failure;
+            }
+        };
+        var method = McpClient.class.getDeclaredMethod("sendOrExplainExit", OutputStream.class, JsonNode.class, Process.class);
+        method.setAccessible(true);
+        try {
+            method.invoke(client, out, new ObjectMapper().createObjectNode(), process);
+        } catch (InvocationTargetException e) {
+            throw e.getCause();
+        }
+    }
 
     @Test
     void stdioServerToolsAcrossPagesWithTheTokenFromEnv(@TempDir Path dir) throws IOException {
