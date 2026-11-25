@@ -2,7 +2,7 @@
 
 Guidance for AI coding agents working in this repository. The canonical, detailed version lives in [CLAUDE.md](CLAUDE.md); this file mirrors the essentials for tools that read `AGENTS.md`.
 
-> **Never send anything out to a remote, and never run `scripts/package.sh`.** No `git push`, no `scp` / `rsync` / `ssh`
+> **Never send anything out to a remote.** No `git push`, no `scp` / `rsync` / `ssh`
 > uploads, no deploying to or running commands on the deploy host. Pulling in is fine (`git pull`, `git fetch`,
 > `git clone`), as is local git (`status`, `diff`, `log`, `add`, `commit`). Shipping out is done by the user.
 
@@ -31,8 +31,10 @@ Layered; depend only downward (full table and conventions in [CLAUDE.md](CLAUDE.
 
 - **L0** superagent-core (domain records, store interfaces, error bases), superagent-api (DTOs)
 - **L1** superagent-storage (JDBC), superagent-runtime (agent CLIs, MCP grants, attachments)
-- **L2** superagent-platform (users, settings, providers, connectors), superagent-skills (skills)
-- **L3** superagent-agent (chat, memory, collaboration), superagent-task (tasks, automations) — siblings, never depend on each other
+- **L2** superagent-platform (users, settings, providers, connectors), superagent-skills (skills), superagent-project
+  (projects), superagent-files (work files and their storage)
+- **L3** superagent-agent (chat, memory, collaboration), superagent-task (tasks, automations) — siblings, never depend on
+  each other; superagent-docs (Feishu / DingTalk docs), superagent-media (speech to text), superagent-cost (model tiers)
 - **L4** superagent-orchestrator (SuperAgent), superagent-event (inbox)
 - **L5** superagent-web (controllers, MCP endpoint, auth), superagent-ui (static UI)
 - **L6** superagent-server (boots it all)
@@ -50,6 +52,12 @@ Everything belongs to one company (multi-tenant): new tables carry `company_id` 
 Settings are per company — don't add new global settings (only CLI install, price catalog and the built-in MCP address are
 platform-wide).
 
+Errors: domain exceptions extend the `com.superagent.core.error` bases; let them propagate — don't catch-and-log at the
+throw site. `GlobalExceptionHandler` (or, for streamed work, the stream's terminal error event) handles them centrally.
+
 ## Deployment
 
-`scripts/package.sh` ships the files changed since the last shipped commit (`scripts/.package-last-commit`, untracked; it stops if missing) to the deploy host: local commit of uncommitted changes → `git diff` → one tarball of added/changed files plus the deleted list → one `scp` + one `ssh` (extract into `/root/SuperAgent`, delete, remove the tarball) → record HEAD. No build, restart, push or git on the host. Only the user runs it.
+`scripts/diff_build.sh <commit-id> [-m <msg>] [-o <dir>]` packages what changed since that commit for someone to apply
+by hand; nothing leaves the machine. It commits uncommitted changes locally first (never any remote operation), then
+writes `superagent-<from>-<to>.tar.gz` holding `changes.tar.gz` and an `apply.sh` run from the target's root. It prints
+`<to>`, the commit to pass next time. Updating a host is done by the user.
