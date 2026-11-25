@@ -58,3 +58,7 @@ docker/.env
 
 # scripts/package.sh: the last commit shipped to the deploy host
 scripts/.package-last-commit
+
+# Runtime files the platform writes into task workspaces (CLI session ids, installed skills).
+# The skills already tracked under .superagent/skills stay tracked; nothing new is added from here.
+.superagent/
