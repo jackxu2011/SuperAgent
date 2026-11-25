@@ -2630,13 +2630,17 @@ public class TaskService implements TaskRecovery {
         return withToolRules(join(prompt, styleGuidePrompt(task)), withTools);
     }
 
-    /** The company's document standard, for every kind but writing (whose flow already carries its standards). */
+    /**
+     * The company's document standard, for the kinds that write for people: not writing (its flow carries its own
+     * standards), not coding (it writes code; the standard would only add its tokens to every turn).
+     */
     String styleGuidePrompt(Task task) {
         return styleGuide(styleGuide, task.flow(), task.title(), task.brief());
     }
 
     static String styleGuide(com.superagent.core.writing.StyleGuideSource source, String flow, String title, String brief) {
-        if (source == null || TaskKind.fromStorage(flow) == TaskKind.ARTICLE) {
+        TaskKind kind = TaskKind.fromStorage(flow);
+        if (source == null || kind == TaskKind.ARTICLE || kind == TaskKind.CODING) {
             return null;
         }
         boolean technical = com.superagent.core.writing.StyleGuideSource.looksTechnical(title + " " + brief);
