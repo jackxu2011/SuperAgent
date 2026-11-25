@@ -3737,13 +3737,36 @@
   const STORE_KEY = "superagent.lang";
   const DEFAULT = "en";
 
-  function getLang() {
+  function isSupportedLang(lang) {
+    return lang === "en" || lang === "zh";
+  }
+
+  function detectBrowserLang() {
+    let preferences = [];
     try {
-      const l = localStorage.getItem(STORE_KEY);
-      if (l && DICT[l]) return l;
+      if (Array.isArray(navigator.languages)) preferences = Array.from(navigator.languages);
+      if (navigator.language) preferences.push(navigator.language);
     } catch (e) { /* storage blocked */ }
+
+    for (const preference of preferences) {
+      if (typeof preference !== "string") continue;
+      const primary = preference.trim().replace(/_/g, "-").split("-")[0].toLowerCase();
+      if (isSupportedLang(primary)) return primary;
+    }
     return DEFAULT;
   }
+
+  function readSavedLang() {
+    try {
+      const lang = localStorage.getItem(STORE_KEY);
+      if (isSupportedLang(lang)) return lang;
+    } catch (e) { /* storage blocked */ }
+    return "";
+  }
+
+  let currentLang = readSavedLang() || detectBrowserLang();
+
+  function getLang() { return currentLang; }
 
   function t(key, vars) {
     const lang = getLang();
@@ -3764,17 +3787,22 @@
   }
 
   function setLang(lang) {
-    if (!DICT[lang]) return;
-    try { localStorage.setItem(STORE_KEY, lang); } catch (e) { /* ignore */ }
+    if (!isSupportedLang(lang)) return;
+    currentLang = lang;
+    let persisted = false;
+    try {
+      localStorage.setItem(STORE_KEY, lang);
+      persisted = true;
+    } catch (e) { /* keep the selection for this page session */ }
     document.documentElement.setAttribute("lang", lang === "zh" ? "zh-CN" : "en");
     apply(document);
+    return persisted;
   }
 
   // Changing language re-renders everything cleanly (dynamic lists included).
   function switchTo(lang) {
     if (lang === getLang()) return;
-    setLang(lang);
-    location.reload();
+    if (setLang(lang)) location.reload();
   }
 
   global.I18N = { t, apply, getLang, setLang, switchTo, langs: Object.keys(DICT) };
