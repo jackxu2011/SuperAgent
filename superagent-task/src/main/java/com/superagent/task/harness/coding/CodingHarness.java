@@ -996,9 +996,7 @@ public class CodingHarness implements TaskHarness {
     }
 
     private static String commitMessage(Task task, HarnessState s) {
-        StringBuilder sb = new StringBuilder(task.title()).append("\n\n");
-        s.criteria.forEach(c -> sb.append("- ").append(c.text()).append("\n"));
-        return sb.append("\nSuperAgent task ").append(task.id()).toString();
+        return CommitMessage.of(task.title(), task.id(), s.criteria.stream().map(HarnessState.Criterion::text).toList(), s.files);
     }
 
     private static String prBody(Task task, HarnessState s) {
