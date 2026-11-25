@@ -56,6 +56,22 @@ class SettingsServiceTest {
     }
 
     @Test
+    void aFieldLeftOutKeepsItsValueAndAnEmptyStringClearsIt() {
+        service.update(new SystemSettingsDto("gpt-5.5", "甲公司", "甲"));
+
+        assertThat(service.update(new SystemSettingsDto(null, null, null))).satisfies(d -> {
+            assertThat(d.agentDefaultModel()).isEqualTo("gpt-5.5");
+            assertThat(d.companyName()).isEqualTo("甲公司");
+            assertThat(d.companyShortName()).isEqualTo("甲");
+        });
+        assertThat(service.update(new SystemSettingsDto("", "", ""))).satisfies(d -> {
+            assertThat(d.agentDefaultModel()).isNull();
+            assertThat(d.companyName()).isNull();
+            assertThat(d.companyShortName()).isNull();
+        });
+    }
+
+    @Test
     void rejectsAModelThatCannotInfer() {
         assertThatThrownBy(() -> service.update(new SystemSettingsDto("claude-listed-only", null, null)))
                 .isInstanceOf(IllegalArgumentException.class);

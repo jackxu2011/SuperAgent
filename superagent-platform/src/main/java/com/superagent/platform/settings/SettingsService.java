@@ -92,7 +92,8 @@ public class SettingsService {
      * being listed isn't enough. Chat picks the CLI from the model at run time.
      */
     public SystemSettingsDto update(SystemSettingsDto request) {
-        String model = trimToNull(request.agentDefaultModel());
+        // Like every other field: null (left out) keeps the saved value, blank clears it.
+        String model = request.agentDefaultModel() == null ? agentDefaultModel() : trimToNull(request.agentDefaultModel());
         // Only a newly chosen model is checked: one that has since failed mustn't block saving the other settings.
         if (model != null && !model.equals(agentDefaultModel()) && providerService.cliFor(model).isEmpty()) {
             throw new IllegalArgumentException("Model " + model + " has not passed the inference check");
@@ -124,8 +125,12 @@ public class SettingsService {
         String shortName = name(request.companyShortName(), 20);
 
         store.put(AGENT_DEFAULT_MODEL, model);
-        store.put(COMPANY_NAME, companyName);
-        store.put(COMPANY_SHORT_NAME, shortName);
+        if (request.companyName() != null) {
+            store.put(COMPANY_NAME, companyName);
+        }
+        if (request.companyShortName() != null) {
+            store.put(COMPANY_SHORT_NAME, shortName);
+        }
         if (backups != null) {
             store.put(BACKUP_MODELS, join(backups));
         }
