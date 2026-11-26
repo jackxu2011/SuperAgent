@@ -155,6 +155,7 @@ Once started, open `http://<host>:18080` and choose **Register an organization**
 ```bash
 mvn clean install                                  # build and test all modules
 scripts/run-local.sh                               # build (mvn package) and run locally on :18080
+scripts/task-prompts.py <task id>                  # turn by turn: what a coding task sent to the model
 ```
 
 `scripts/run-local.sh` copies the executable jar into `run/` and runs that copy, so building or `mvn install` while the server runs doesn't affect it. Arguments go to the server (e.g. `--server.port=18099`); `SKIP_BUILD=1` runs the last build. The UI is served straight from `superagent-ui/src/main/resources/static`, so front-end edits show up on a browser refresh; back-end (Java) changes need the script run again.
