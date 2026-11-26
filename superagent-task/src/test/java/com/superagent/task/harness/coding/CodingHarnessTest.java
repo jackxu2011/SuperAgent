@@ -262,7 +262,7 @@ class CodingHarnessTest {
         assertThat(s.criteria).allMatch(HarnessState.Criterion::met);
         // Merged into main as one commit; the worktree and its branch are gone.
         assertThat(Files.readString(repo.resolve("hello.txt"))).isEqualTo("hi\n");
-        assertThat(git(repo, "log", "--format=%s", "-1")).isEqualTo("加 hello.txt");
+        assertThat(git(repo, "log", "--format=%s", "-1")).isEqualTo("feat(repo): 加 hello.txt");
         assertThat(git(repo, "rev-list", "--count", "HEAD")).isEqualTo("2");
         assertThat(Path.of(s.dir)).doesNotExist();
         assertThat(git(repo, "branch", "--list", s.branch)).isEmpty();
@@ -290,7 +290,7 @@ class CodingHarnessTest {
         assertThat(ha.status).isEqualTo(TaskStatus.DONE);
         assertThat(hb.status).isEqualTo(TaskStatus.DONE);
         assertThat(sb.deliveryNote).contains("变基");                    // B started before A merged
-        assertThat(git(repo, "log", "--format=%s")).isEqualTo("加 b.txt\n加 a.txt\ninit");
+        assertThat(git(repo, "log", "--format=%s")).isEqualTo("feat(repo): 加 b.txt\nfeat(repo): 加 a.txt\ninit");
         assertThat(repo.resolve("a.txt")).exists();
         assertThat(repo.resolve("b.txt")).exists();
     }
@@ -559,7 +559,7 @@ class CodingHarnessTest {
 
         assertThat(host.status).isEqualTo(TaskStatus.DONE);
         assertThat(Files.readString(repo.resolve("shared.txt"))).isEqualTo("main\nhi\n");
-        assertThat(git(repo, "log", "--format=%s", "-3")).isEqualTo("改 shared.txt\nmain 改了 shared\nadd shared");
+        assertThat(git(repo, "log", "--format=%s", "-3")).isEqualTo("feat(repo): 改 shared.txt\nmain 改了 shared\nadd shared");
         assertThat(s.step(CodingHarness.RESOLVE).status).isEqualTo(HarnessState.Status.DONE);
         assertThat(s.steps).extracting(st -> st.key).endsWith(CodingHarness.RESOLVE, CodingHarness.DELIVER);
         // The task's two commits (the work, then its fix) were squashed first: one conflict, resolved in one go.
