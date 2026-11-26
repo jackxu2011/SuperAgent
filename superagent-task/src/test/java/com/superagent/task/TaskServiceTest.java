@@ -997,11 +997,12 @@ class TaskServiceTest {
         TaskService service = service(runner, tasks);
         service.setLinks(new InMemoryLinks());
         svc.set(service);
+        service.useScheduler(() -> { }); // recorded, not run: it starts once its id is known to the runner
+        String id = service.create(new CreateTaskRequest("市场全景调研", "分头调研 7 个细分市场，再汇总", null, null, null,
+                null, null, null, "complex")).id();
+        parentId.set(id);
         Thread loop = schedulerLoop(service);
         try {
-            String id = service.create(new CreateTaskRequest("市场全景调研", "分头调研 7 个细分市场，再汇总", null, null, null,
-                    null, null, null, "complex")).id();
-            parentId.set(id);
             await().atMost(Duration.ofSeconds(15)).until(() -> tasks.findTask(id).orElseThrow().status().name().equals("DONE"));
 
             assertThat(most.get()).isBetween(2, 5); // side by side, never more than the default limit of 5
@@ -1088,11 +1089,12 @@ class TaskServiceTest {
         service.setLinks(new InMemoryLinks());
         service.setHarnesses(List.of(new com.superagent.task.harness.general.GeneralHarness()));
         svc.set(service);
+        service.useScheduler(() -> { }); // recorded, not run: it starts once its id is known to the runner
+        String id = service.create(new CreateTaskRequest("两块调研", "分头调研两块，再汇总出结论", null, null, null,
+                null, null, null, "complex")).id();
+        parentId.set(id);
         Thread loop = schedulerLoop(service);
         try {
-            String id = service.create(new CreateTaskRequest("两块调研", "分头调研两块，再汇总出结论", null, null, null,
-                    null, null, null, "complex")).id();
-            parentId.set(id);
             await().atMost(Duration.ofSeconds(15)).until(() -> tasks.findTask(id).orElseThrow().status().name().equals("DONE"));
 
             List<String> kids = service.relations(id, "tester").subtasks().stream().map(k -> k.id()).toList();
@@ -1244,11 +1246,12 @@ class TaskServiceTest {
         TaskService service = service(runner, tasks);
         service.setLinks(new InMemoryLinks());
         svc.set(service);
+        service.useScheduler(() -> { }); // recorded, not run: it starts once its id is known to the runner
+        String id = service.create(new CreateTaskRequest("两块调研", "分两块", null, null, null, null, null, null,
+                "complex")).id();
+        parentId.set(id);
         Thread loop = schedulerLoop(service);
         try {
-            String id = service.create(new CreateTaskRequest("两块调研", "分两块", null, null, null, null, null, null,
-                    "complex")).id();
-            parentId.set(id);
             await().atMost(Duration.ofSeconds(10)).until(() -> service.children(id).size() == 2);
             Task bad = service.children(id).get(1);
             // What the watchdog does: retry the failed subtask until its retries run out.

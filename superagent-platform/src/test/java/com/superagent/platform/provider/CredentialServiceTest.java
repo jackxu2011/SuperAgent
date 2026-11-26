@@ -117,6 +117,7 @@ class CredentialServiceTest {
         assertThat(svc.list("claude")).isEmpty(); // the key page still opens, to add the first one
         String main = svc.add("claude", new CredentialRequests.Save("官方", "", "sk-ant-main-0000000001", false, null)).id();
         String relay = svc.add("claude", new CredentialRequests.Save("中转", "https://relay.example/", "relay-token-000000002", true, null)).id();
+        svc.awaitChecks(); // the checks add() queued: otherwise one could write "ok" over the failures marked below
         assertThat(svc.current("claude").credential().apiKey()).isEqualTo("sk-ant-main-0000000001");
         // No endpoint of its own: sent to the official address explicitly, never left to the server's CLI config.
         assertThat(svc.current("claude").credential().baseUrl()).isEqualTo("https://api.anthropic.com");

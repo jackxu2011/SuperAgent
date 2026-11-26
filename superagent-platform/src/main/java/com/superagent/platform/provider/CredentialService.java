@@ -364,6 +364,21 @@ public class CredentialService {
         return ordered.size() > MAX_TEST_MODELS ? ordered.subList(0, MAX_TEST_MODELS) : ordered;
     }
 
+    /**
+     * Waits until the checks queued so far have run (the checker is one thread, so a task queued now runs after them).
+     * For tests: a check queued by {@link #add} reads the probe when it starts but writes when it ends, and could
+     * otherwise land after a later step of the test.
+     */
+    void awaitChecks() {
+        try {
+            checker.submit(() -> { }).get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+            throw new IllegalStateException("queued key checks didn't finish", e);
+        }
+    }
+
     private void checkSoon(String id) {
         checker.execute(TenantContext.wrap(() -> store.find(id).ifPresent(c -> {
             String before = current(c.providerKey()).id();
