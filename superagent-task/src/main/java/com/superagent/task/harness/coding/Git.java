@@ -66,7 +66,54 @@ final class Git {
 
     /** A check, through the shell, as a person would type it. */
     Result shell(Path dir, String command, int timeoutSeconds) {
-        return run(List.of("/bin/sh", "-c", command), dir, timeoutSeconds, Map.of(), true);
+        java.util.Optional<Path> bash = WINDOWS ? GIT_BASH.computeIfAbsent(searchPath(), Git::gitBash) : java.util.Optional.empty();
+        return run(shellCommand(command, WINDOWS, bash), dir, timeoutSeconds, Map.of(), true);
+    }
+
+    private static final boolean WINDOWS =
+            System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+    private static final Map<String, java.util.Optional<Path>> GIT_BASH = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private String searchPath() {
+        String path = env.getOrDefault("PATH", System.getenv("PATH"));
+        return path == null ? "" : path;
+    }
+
+    /**
+     * How a check is started: {@code /bin/sh -c} on Unix. Checks are written for a POSIX shell, so on Windows they run
+     * in Git for Windows' bash (a coding task needs git anyway), else in {@code cmd /c}.
+     */
+    static List<String> shellCommand(String command, boolean windows, java.util.Optional<Path> gitBash) {
+        if (!windows) {
+            return List.of("/bin/sh", "-c", command);
+        }
+        return gitBash.map(b -> List.of(b.toString(), "-c", command)).orElseGet(() -> List.of("cmd.exe", "/c", command));
+    }
+
+    /**
+     * Git for Windows' bash, found from git.exe on {@code path} ({@code <root>\cmd\git.exe} or {@code <root>\bin\git.exe},
+     * bash at {@code <root>\bin\bash.exe}). Looking for "bash" on the PATH instead would usually find
+     * {@code C:\Windows\System32\bash.exe}, which starts WSL, not a shell on this machine's files.
+     */
+    static java.util.Optional<Path> gitBash(String path) {
+        for (String entry : path.split(java.io.File.pathSeparator)) {
+            if (entry.isBlank()) {
+                continue;
+            }
+            try {
+                Path git = Path.of(entry.strip(), "git.exe");
+                Path root = git.getParent().getParent();
+                if (root != null && java.nio.file.Files.isRegularFile(git)) {
+                    Path bash = root.resolve("bin").resolve("bash.exe");
+                    if (java.nio.file.Files.isRegularFile(bash)) {
+                        return java.util.Optional.of(bash);
+                    }
+                }
+            } catch (java.nio.file.InvalidPathException e) {
+                // a malformed PATH entry: skip it
+            }
+        }
+        return java.util.Optional.empty();
     }
 
     String text(Path dir, String... args) {
