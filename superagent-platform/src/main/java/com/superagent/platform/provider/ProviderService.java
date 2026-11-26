@@ -132,7 +132,7 @@ public class ProviderService {
     /** Without a key store (tests), the machine's own CLI login stands in. */
     private boolean machineLogin(ProviderCatalog.Entry entry) {
         if (credentials != null && credentials.allowsCliLogin(entry.key())) {
-            return probe.codexLoggedIn();
+            return "claude".equals(entry.key()) ? probe.claudeLoggedIn() : probe.codexLoggedIn();
         }
         return credentials == null && probe.looksAuthenticated(entry);
     }

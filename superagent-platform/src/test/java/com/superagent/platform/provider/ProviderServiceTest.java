@@ -49,6 +49,7 @@ class ProviderServiceTest {
     private static final class FakeProbe extends ProviderProbe {
         private final boolean installed;
         private final boolean authed;
+        boolean claudeAuthed;
         FakeProbe(boolean installed, boolean authed) {
             super(new CliPaths(System.getProperty("java.io.tmpdir") + "/sa-test-node"));
             this.installed = installed;
@@ -60,6 +61,7 @@ class ProviderServiceTest {
         @Override public Optional<String> version(Path binary, List<String> args) { return Optional.of("1.2.3"); }
         @Override public boolean looksAuthenticated(ProviderCatalog.Entry e) { return authed; }
         @Override public boolean codexLoggedIn() { return authed; }
+        @Override public boolean claudeLoggedIn() { return claudeAuthed; }
         @Override public Optional<String> latestNpmVersion(String pkg) { return Optional.of("1.3.0"); }
     }
 
@@ -190,6 +192,23 @@ class ProviderServiceTest {
         assertThat(fetched.modelsJson()).contains("gpt-6-sol");
         service.refreshInference(fetched, true);
         assertThat(inference.calls).isGreaterThan(0);
+    }
+
+    @Test
+    void enabledClaudeLoginAsksClaudeNotCodex() {
+        InMemoryStore store = new InMemoryStore();
+        FakeProbe probe = new FakeProbe(true, false); // codex not logged in
+        probe.claudeAuthed = true;
+        CredentialService credentials = org.mockito.Mockito.mock(CredentialService.class);
+        org.mockito.Mockito.when(credentials.allowsCliLogin("claude")).thenReturn(true);
+        ProviderService service = new ProviderService(store, probe, new FakeFetcher(), new FakeInference(),
+                new FakeNode(probe, "v24.11.0"), credentials);
+        ModelProvider p = new ModelProvider("claude-test", "claude", false, false, null, null,
+                "no_auth", null, null, null, null, java.time.Instant.now(), java.time.Instant.now());
+        store.save(p);
+        assertThat(service.refreshLocal(p).status()).isNotEqualTo("no_auth");
+        probe.claudeAuthed = false;
+        assertThat(service.refreshLocal(p).status()).isEqualTo("no_auth");
     }
 
     @Test
