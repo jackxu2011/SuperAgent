@@ -56,7 +56,10 @@ public class ProviderModelFetcher {
     private final ProviderProbe probe;
     private final MachineCredentials machine;
     private static final ObjectMapper mapper = new ObjectMapper();
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    // HTTP/1.1: over plain http the default HTTP/2 client first sends an h2c upgrade, which local relays
+    // (claude-code-router and the like) accept the socket for and never answer — the request just times out.
+    private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(Duration.ofSeconds(5)).build();
 
     public ProviderModelFetcher(ProviderProbe probe, MachineCredentials machine) {
         this.probe = probe;

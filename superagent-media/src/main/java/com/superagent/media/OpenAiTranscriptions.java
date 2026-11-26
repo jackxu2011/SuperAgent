@@ -26,8 +26,9 @@ final class OpenAiTranscriptions implements Transcriber.Api {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     // Never follow a redirect: it would carry the key to wherever the response points.
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15))
-            .followRedirects(HttpClient.Redirect.NEVER).build();
+    // HTTP/1.1: a local relay may swallow the default client's h2c upgrade and never reply.
+    private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NEVER).build();
 
     @Override
     public Transcriber.Piece transcribe(RunCredential credential, Path file, Transcriber.Request request)

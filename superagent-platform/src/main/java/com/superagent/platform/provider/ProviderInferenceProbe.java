@@ -47,7 +47,9 @@ public class ProviderInferenceProbe {
 
     private final ProviderProbe probe;
     private static final ObjectMapper mapper = new ObjectMapper();
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    // HTTP/1.1: a local relay may swallow the default client's h2c upgrade and never reply (see ProviderModelFetcher).
+    private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(Duration.ofSeconds(5)).build();
 
     /** Who background checks are booked to in the usage records. */
     public static final String SYSTEM_USER = "system";
