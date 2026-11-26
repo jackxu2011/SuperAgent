@@ -142,8 +142,9 @@ ael.form.addEventListener("submit", async e => {
   const name = ael.name.value.trim();
   if (!name) return;
   // No model: new agents chat with the admin-set system default (System Settings).
+  // On update a null field keeps its value: "" is what switches to a custom character.
   const body = { name, persona: ael.persona.value.trim(), model: editingAgentId ? editingAgentModel : null,
-    avatar: chosenAvatar, character: chosenCharacter, skillIds: Array.from(chosenSkills) };
+    avatar: chosenAvatar, character: chosenCharacter || "", skillIds: Array.from(chosenSkills) };
   const res = editingAgentId
     ? await api.updateAgent(editingAgentId, body)
     : await api.createAgent(body);
