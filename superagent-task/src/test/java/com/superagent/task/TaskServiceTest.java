@@ -1344,6 +1344,51 @@ class TaskServiceTest {
     }
 
     @Test
+    void independentCheckTurnsLeaveOutTheDoerButKeepTheProject() {
+        List<String> systemPrompts = Collections.synchronizedList(new ArrayList<>());
+        AgentRunner runner = new AgentRunner() {
+            @Override public AgentType type() { return AgentType.CLAUDE; }
+            @Override public void run(AgentRunRequest req, AgentEventSink sink, Cancellation c) {
+                systemPrompts.add(req.systemPrompt());
+                sink.emit(new AgentEvent(req.sessionId(), null, 0, AgentEventType.RESULT, "好了。", Instant.now()));
+            }
+        };
+        InMemoryTaskStore tasks = new InMemoryTaskStore();
+        com.superagent.core.task.TaskAgentStore taskAgents = org.mockito.Mockito.mock(com.superagent.core.task.TaskAgentStore.class);
+        org.mockito.Mockito.when(taskAgents.agentOf(org.mockito.ArgumentMatchers.any())).thenReturn(Optional.of("a1"));
+        TaskService service = new TaskService(tasks, new InMemoryTaskPhaseStore(), new InMemoryTaskRunStateStore(),
+                new InMemoryRunStore(), List.of(runner), IMAGES,
+                System.getProperty("java.io.tmpdir") + "/sa-test-" + UUID.randomUUID(), "", "", false, 5, "tester",
+                null, null, taskAgents, null, null);
+        service.setDoers(new com.superagent.core.task.TaskDoers() {
+            @Override public Optional<Doer> doer(String agentId) {
+                return Optional.of(new Doer("小审", "人设：严谨的工程师", "记忆：用户偏好中文"));
+            }
+            @Override public Optional<String> name(String agentId) { return Optional.of("小审"); }
+        });
+        com.superagent.core.project.ProjectAccess projects = org.mockito.Mockito.mock(com.superagent.core.project.ProjectAccess.class);
+        org.mockito.Mockito.when(projects.context(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Optional.of("## 项目共同上下文（项目「看板」）\n约定：金额两位小数"));
+        service.setProjects(projects);
+        String id = service.create(brief("检查轮")).id();
+        awaitStatus(tasks, id, "DONE");
+        Task task = tasks.findTask(id).orElseThrow();
+
+        systemPrompts.clear();
+        service.harnessHost.turn(task, "开发", "s-dev", true, "dev", new Cancellation());
+        service.harnessHost.reviewTurn(task, null, "审查", "s-review", "review", new Cancellation());
+        service.harnessHost.turnOn(task, null, "检查", "s-check", "check", new Cancellation());
+
+        assertThat(systemPrompts).hasSize(3);
+        assertThat(systemPrompts.get(0)).contains("## 你是谁\n你是「小审」，这个任务由你自己执行。", "人设：严谨的工程师",
+                "## 你的记忆（之前和用户共事时记下的）\n记忆：用户偏好中文", "金额两位小数");
+        assertThat(systemPrompts.get(0).indexOf("你是谁")).isLessThan(systemPrompts.get(0).indexOf("项目共同上下文"));
+        assertThat(systemPrompts.subList(1, 3)).allSatisfy(p -> assertThat(p)
+                .contains("## 项目共同上下文（项目「看板」）", "金额两位小数")
+                .doesNotContain("你是「", "这个任务由你自己执行", "人设：严谨的工程师", "你的记忆", "记忆：用户偏好中文"));
+    }
+
+    @Test
     void handoverKeepsPendingAndWaitingTasksRunningOnlyStopsActiveOnes() {
         InMemoryTaskStore tasks = new InMemoryTaskStore();
         TaskService service = service(new FakeRunner(() -> "done."), tasks);
