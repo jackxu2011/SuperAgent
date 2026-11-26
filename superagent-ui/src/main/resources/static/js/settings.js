@@ -58,6 +58,17 @@ async function loadSettingsForm() {
   sel.docStyleOn.checked = systemSettings.docStyleOn !== false;
   fillDocStyleSkills(systemSettings.docStyleSkill || "");
 
+  renderModelChoices(groups, listed, failed, current);
+  backupModels = (systemSettings.backupModels || []).slice();
+  backupGroups = groups;
+  renderBackupModels();
+  loadFixedModels();
+  if (!failed && !ok) waitForModels();
+}
+
+/** The default-model dropdown, from the models that pass the check; {@code current} stays selected. */
+function renderModelChoices(groups, listed, failed, current) {
+  const ok = groups.reduce((n, g) => n + g.models.length, 0);
   sel.agentModel.innerHTML = "";
   const def = document.createElement("option");
   def.value = "";
@@ -77,10 +88,26 @@ async function loadSettingsForm() {
   sel.missing.hidden = !none;
   sel.filtered.hidden = !ok || ok === listed;
   sel.filtered.textContent = L("settings.modelsFiltered", { ok, total: listed });
-  backupModels = (systemSettings.backupModels || []).slice();
-  backupGroups = groups;
-  renderBackupModels();
-  loadFixedModels();
+}
+
+// Opened right after a start, the models may not have passed their check yet: look again for a while, and refresh
+// only the model choices when they appear, so nothing typed into the form meanwhile is lost.
+const MODEL_WAIT_MS = 5000, MODEL_WAIT_TRIES = 24;
+let modelWait = null;
+function waitForModels(tries = MODEL_WAIT_TRIES) {
+  clearTimeout(modelWait);
+  modelWait = setTimeout(async () => {
+    if (document.querySelector('[data-pane="settings"]').hidden) return; // left the page: loading it again restarts this
+    const { groups, listed, failed } = await loadChatModels();
+    if (failed || !groups.length) {
+      if (tries > 1) waitForModels(tries - 1);
+      return;
+    }
+    renderModelChoices(groups, listed, failed, sel.agentModel.value);
+    backupGroups = groups;
+    renderBackupModels();
+    refreshFixedOffered();
+  }, MODEL_WAIT_MS);
 }
 
 // Backup models: where conversations go, in order, when the default model can't run.
@@ -177,6 +204,10 @@ async function loadFixedModels() {
   fixedModels = (systemSettings.taskFixedModels || []).slice();
   fixedSelect.on.checked = !!systemSettings.taskFixedModelsOn;
   fixedSelect.field.hidden = !fixedSelect.on.checked;
+  await refreshFixedOffered();
+}
+/** The models tasks may be held to; the ticks made so far stay. */
+async function refreshFixedOffered() {
   try { fixedOffered = ((await api.mpOverview()) || {}).models || []; } catch (e) { fixedOffered = []; }
   fixedOffered = fixedOffered.filter(m => m.forTasks);
   renderFixedModels();
