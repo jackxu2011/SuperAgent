@@ -26,15 +26,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Reads a server's tool list the standard way, over a local command and over streamable HTTP. */
 class McpClientTest {
 
+    /**
+     * Scripts run through sh rather than executed themselves: a test that writes a script and execs it at once fails
+     * now and then with "Text file busy" (ETXTBSY), when a process another test forks at that moment inherits the
+     * script's still-open write handle. sh only reads it.
+     */
+    private static final String SH = "/bin/sh";
+
     private final McpClient client = new McpClient();
 
     @Test
     void stdioImmediatelyExitedServerReportsExitCode(@TempDir Path dir) throws IOException {
         Path server = dir.resolve("exit.sh");
         Files.writeString(server, "#!/bin/sh\nexit 3\n");
-        server.toFile().setExecutable(true);
         assertThatThrownBy(() -> client.listTools(new McpServerSpec("x", ConnectorTransport.STDIO, null, Map.of(),
-                server.toString(), List.of(), Map.of()), Duration.ofSeconds(10))).hasMessageContaining("退出码 3");
+                SH, List.of(server.toString()), Map.of()), Duration.ofSeconds(10))).hasMessageContaining("退出码 3");
     }
 
     @Test
@@ -48,9 +54,8 @@ class McpClientTest {
                 sleep 0.3
                 exit 3
                 """);
-        server.toFile().setExecutable(true);
         assertThatThrownBy(() -> client.listTools(new McpServerSpec("x", ConnectorTransport.STDIO, null, Map.of(),
-                server.toString(), List.of(), Map.of()), Duration.ofSeconds(10)))
+                SH, List.of(server.toString()), Map.of()), Duration.ofSeconds(10)))
                 .hasMessageContaining("退出码 3").hasCauseInstanceOf(IOException.class);
     }
 
@@ -120,19 +125,17 @@ class McpClientTest {
                 read l; echo "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":3,\\"result\\":{\\"tools\\":[{\\"name\\":\\"whoami_$TOKEN\\"}]}}"
                 read l
                 """);
-        server.toFile().setExecutable(true);
 
         List<JsonNode> tools = client.listTools(new McpServerSpec("x", ConnectorTransport.STDIO, null, Map.of(),
-                server.toString(), List.of(), Map.of("TOKEN", "ada")), Duration.ofSeconds(10));
+                SH, List.of(server.toString()), Map.of("TOKEN", "ada")), Duration.ofSeconds(10));
 
         assertThat(tools).extracting(t -> t.path("name").asText()).containsExactly("list_repos", "whoami_ada");
         assertThat(tools.get(0).path("annotations").path("readOnlyHint").asBoolean()).isTrue();
 
         Path dies = dir.resolve("dies.sh");
         Files.writeString(dies, "#!/bin/sh\nexit 3\n");
-        dies.toFile().setExecutable(true);
         assertThatThrownBy(() -> client.listTools(new McpServerSpec("x", ConnectorTransport.STDIO, null, Map.of(),
-                dies.toString(), List.of(), Map.of()), Duration.ofSeconds(10))).hasMessageContaining("退出");
+                SH, List.of(dies.toString()), Map.of()), Duration.ofSeconds(10))).hasMessageContaining("退出");
     }
 
     @Test
