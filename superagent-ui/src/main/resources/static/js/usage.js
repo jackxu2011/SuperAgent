@@ -89,6 +89,7 @@ async function loadUsage() {
   usRenderChart(s.byDay);
   usEl.agentsCount.textContent = s.agents.length;
   usEl.tasksCount.textContent = s.tasks.length;
+  document.getElementById("usProjectsCount").textContent = (s.byProject || []).length;
   document.getElementById("usSystemTab").hidden = !company;
   document.getElementById("usSystemCount").textContent = (s.system || []).length;
   if (!company && usKind === "system") usKind = "agents";
@@ -115,6 +116,17 @@ function usRenderDetail() {
         L("us.cost"), L("us.colRuns"), L("us.colLast")],
       cells: r => { const [kind, model] = r.key.split("|"); return [L("us.src." + kind), model || "—", usNum(r.input),
         usNum(r.cacheRead), usNum(r.output), usNum(r.total), usCost(r), usNum(r.runs), r.lastAt ? relativeTime(r.lastAt) : "—"]; },
+    }));
+    return;
+  }
+  if (usKind === "projects") {
+    usEl.detail.replaceChildren(usTable(null, s.byProject || [], {
+      textCols: 1,
+      head: [L("us.colProject"), L("us.colModel"), L("us.input"), L("us.cacheRead"), L("us.cacheWrite"),
+        L("us.output"), L("us.reasoning"), L("us.colTotal"), L("us.cost"), L("us.colRuns"), L("us.colLast")],
+      cells: r => [r.key ? (r.label || L("us.hiddenProject")) : L("us.noProject"), (r.models || []).join(", ") || "—",
+        usNum(r.input), usNum(r.cacheRead), usNum(r.cacheWrite), usNum(r.output), usNum(r.reasoning),
+        usNum(r.total), usCost(r), usNum(r.runs), r.lastAt ? relativeTime(r.lastAt) : "—"],
     }));
     return;
   }

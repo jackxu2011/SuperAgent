@@ -58,7 +58,7 @@ class QuotaServiceTest {
     }
 
     private static UsageRecord record(Instant at, long input) {
-        return new UsageRecord("u" + at.toEpochMilli(), at, "ada", "chat", null, null, null, "claude", "m", input, 0, 0, 0,
+        return new UsageRecord("u" + at.toEpochMilli(), at, "ada", "chat", null, null, null, null, "claude", "m", input, 0, 0, 0,
                 0, 0, 0, null, null);
     }
 }

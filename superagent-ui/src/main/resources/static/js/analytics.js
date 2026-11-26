@@ -66,4 +66,14 @@ async function loadAnalytics() {
     });
     return tr;
   }));
+
+  document.getElementById("anProjects").replaceChildren(...(a.projects || []).map(p => {
+    const tr = document.createElement("tr");
+    [p.name || L("an.noProject"), p.tasks, "$" + Number(p.spend || 0).toFixed(2)].forEach(v => {
+      const td = document.createElement("td");
+      td.textContent = v;
+      tr.appendChild(td);
+    });
+    return tr;
+  }));
 }

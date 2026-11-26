@@ -5,11 +5,15 @@ import com.superagent.core.agent.AgentStatus;
 import com.superagent.core.agent.AgentStore;
 import com.superagent.core.automation.Automation;
 import com.superagent.core.automation.AutomationStore;
+import com.superagent.core.project.ProjectAccess;
+import com.superagent.core.project.ProjectItemKind;
+import com.superagent.core.project.ProjectStore;
 import com.superagent.core.task.Task;
 import com.superagent.core.task.TaskStatus;
 import com.superagent.core.task.TaskStore;
 import com.superagent.core.user.User;
 import com.superagent.core.user.UserStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -37,12 +41,24 @@ public class AnalyticsService {
     private final AgentStore agents;
     private final AutomationStore automations;
     private final TaskStore tasks;
+    private ProjectAccess projects;
+    private ProjectStore projectStore;
 
     public AnalyticsService(UserStore users, AgentStore agents, AutomationStore automations, TaskStore tasks) {
         this.users = users;
         this.agents = agents;
         this.automations = automations;
         this.tasks = tasks;
+    }
+
+    @Autowired(required = false)
+    void setProjects(ProjectAccess projects) {
+        this.projects = projects;
+    }
+
+    @Autowired(required = false)
+    void setProjectStore(ProjectStore projectStore) {
+        this.projectStore = projectStore;
     }
 
     public AnalyticsDto overview(int days) {
@@ -65,6 +81,8 @@ public class AnalyticsService {
             byDay.put(today.minusDays(i), new int[3]);
         }
         Map<String, ModelTotals> byModel = new LinkedHashMap<>();
+        Map<String, ModelTotals> byProject = new LinkedHashMap<>();
+        Map<String, String> taskProjects = projects == null ? Map.of() : projects.projectsOfKind(ProjectItemKind.TASK);
         BigDecimal spend = BigDecimal.ZERO;
         for (Task t : live) {
             int[] created = byDay.get(LocalDate.ofInstant(t.createdAt(), zone));
@@ -80,6 +98,8 @@ public class AnalyticsService {
             BigDecimal cost = t.spend() == null ? BigDecimal.ZERO : t.spend();
             spend = spend.add(cost);
             byModel.computeIfAbsent(t.model() == null ? "" : t.model(), k -> new ModelTotals()).add(cost);
+            String projectId = taskProjects.get(t.id());
+            byProject.computeIfAbsent(projectId == null || projectId.isEmpty() ? "" : projectId, k -> new ModelTotals()).add(cost);
         }
 
         List<AnalyticsDto.Day> daily = new ArrayList<>();
@@ -89,11 +109,24 @@ public class AnalyticsService {
                         e.getValue().spend))
                 .sorted(Comparator.comparingInt(AnalyticsDto.ModelUsage::tasks).reversed())
                 .toList();
+        Map<String, String> names = new java.util.HashMap<>();
+        if (projectStore != null) {
+            projectStore.list().forEach(p -> names.put(p.id(), p.name()));
+        }
+        List<AnalyticsDto.ProjectUsage> projectRows = byProject.entrySet().stream()
+                .map(e -> {
+                    String id = e.getKey().isEmpty() ? null : e.getKey();
+                    String name = id == null ? null : names.getOrDefault(id, id);
+                    return new AnalyticsDto.ProjectUsage(id, name, e.getValue().tasks, e.getValue().spend);
+                })
+                .sorted(Comparator.comparing((AnalyticsDto.ProjectUsage p) -> p.spend() == null ? BigDecimal.ZERO : p.spend())
+                        .reversed())
+                .toList();
         return new AnalyticsDto(allUsers.size(), (int) allUsers.stream().filter(User::enabled).count(), active,
                 ACTIVE_DAYS, (int) agents.list().stream().filter(a -> a.status() != AgentStatus.DELETED).count(),
                 allAutomations.size(), (int) allAutomations.stream().filter(Automation::enabled).count(),
                 live.size(), done, failed, done + failed == 0 ? null : (double) done / (done + failed), spend,
-                daily, models);
+                daily, models, projectRows);
     }
 
     private static final class ModelTotals {

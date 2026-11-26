@@ -23,12 +23,18 @@ public record AnalyticsDto(
         Double successRate,
         BigDecimal spend,
         List<Day> daily,
-        List<ModelUsage> models) {
+        List<ModelUsage> models,
+        /** Task spend grouped by project ({@code projectId} null = not in a project). */
+        List<ProjectUsage> projects) {
 
     public record Day(LocalDate date, int created, int done, int failed) {
     }
 
     /** {@code model} null = the CLI's own default model. */
     public record ModelUsage(String model, int tasks, BigDecimal spend) {
+    }
+
+    /** {@code projectId} null = tasks not in any project; {@code name} is how to show it. */
+    public record ProjectUsage(String projectId, String name, int tasks, BigDecimal spend) {
     }
 }

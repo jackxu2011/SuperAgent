@@ -495,6 +495,11 @@ public class ProjectService implements ProjectAccess {
     }
 
     @Override
+    public Map<String, String> projectsOfKind(ProjectItemKind kind) {
+        return kind == null ? Map.of() : items.projectsOfKind(kind);
+    }
+
+    @Override
     public List<ProjectRepo> reposOfAgent(String agentId) {
         return projectOfAgent(agentId).map(context::repos).orElse(List.of());
     }

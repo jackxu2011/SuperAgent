@@ -598,6 +598,7 @@
             <div class="fl-kinds" id="usKinds" role="tablist">
               <button type="button" class="model-tab is-active" data-kind="agents" data-i18n-title="us.hintAgents"><span data-i18n="us.kindAgents">Agents</span> <b id="usAgentsCount"></b></button>
               <button type="button" class="model-tab" data-kind="tasks" data-i18n-title="us.hintTasks"><span data-i18n="us.kindTasks">Tasks</span> <b id="usTasksCount"></b></button>
+              <button type="button" class="model-tab" data-kind="projects" data-i18n-title="us.hintProjects"><span data-i18n="us.kindProjects">Projects</span> <b id="usProjectsCount"></b></button>
               <button type="button" class="model-tab" data-kind="system" id="usSystemTab" data-i18n-title="us.hintSystem" hidden><span data-i18n="us.kindSystem">System background</span> <b id="usSystemCount"></b></button>
             </div>
           </div>
@@ -630,6 +631,12 @@
         <table class="ctable">
           <thead><tr><th data-i18n="an.model">Model</th><th data-i18n="an.tasks">Tasks</th><th data-i18n="an.spend">Spend</th></tr></thead>
           <tbody id="anModels"></tbody>
+        </table>
+        <h3 class="panel__title panel__title--spaced" data-i18n="an.projects">By project (task spend)</h3>
+        <p class="field-hint" data-i18n="an.projectsHint">Sum of each task’s spend in its project. Differs from Usage → Projects (token rows).</p>
+        <table class="ctable">
+          <thead><tr><th data-i18n="an.project">Project</th><th data-i18n="an.tasks">Tasks</th><th data-i18n="an.spend">Spend</th></tr></thead>
+          <tbody id="anProjects"></tbody>
         </table>
       </div>
     </section>

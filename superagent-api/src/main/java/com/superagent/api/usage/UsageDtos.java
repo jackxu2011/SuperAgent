@@ -38,9 +38,11 @@ public final class UsageDtos {
      * Usage over a period, in its two kinds: {@code tasks} (one row per task, the choice of its model included) and
      * {@code agents} (everything else: chats, the SuperAgent and its background, agents' memory, one row per agent;
      * key "" for what belongs to no agent). {@code byUser} only in the company view.
+     * {@code byProject}: people's runs grouped by project (key "" = no project); label is the project name.
      */
     public record Summary(Instant from, Instant to, Total total, Total taskTotal, Total agentTotal, List<Total> byDay,
                           List<Total> tasks, List<Total> agents, List<Total> byModel, List<Total> byUser,
+                          List<Total> byProject,
                           /**
                            * The system's own background work (checking models and keys), which belongs to nobody:
                            * {@code systemTotal} and one row per kind and model ({@code key} "kind|model"). Company view only.

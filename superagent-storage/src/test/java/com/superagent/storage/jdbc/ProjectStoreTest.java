@@ -57,6 +57,8 @@ class ProjectStoreTest {
         items.assign(ProjectItemKind.FILE, "t1", "p2"); // kinds don't collide
         assertThat(items.items(ProjectItemKind.TASK, "p1")).containsExactly("t1");
         assertThat(items.projectOf(ProjectItemKind.FILE, "t1")).contains("p2");
+        assertThat(items.projectsOfKind(ProjectItemKind.TASK)).containsEntry("t1", "p1");
+        assertThat(items.projectsOfKind(ProjectItemKind.FILE)).containsEntry("t1", "p2");
 
         // Another company sees none of it; the same item id there is its own row.
         TenantContext.run(InCompany.OTHER, () -> {

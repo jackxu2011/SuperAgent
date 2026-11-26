@@ -73,11 +73,11 @@ class SessionLengthTest {
             }
             if (turnSumNoPeak > 0) {
                 // an older CLI's record: many requests summed, no per-request figure
-                return new UsageRecord("u", Instant.now(), "alice", "chat", "a1", null, sessionId, "claude", "opus",
+                return new UsageRecord("u", Instant.now(), "alice", "chat", "a1", null, null, sessionId, "claude", "opus",
                         turnSumNoPeak, 0, 0, 0, 5, 0, 0, null, null);
             }
             return contextOfLastTurn == 0 ? null
-                    : new UsageRecord("u", Instant.now(), "alice", "chat", "a1", null, sessionId, "claude", "opus",
+                    : new UsageRecord("u", Instant.now(), "alice", "chat", "a1", null, null, sessionId, "claude", "opus",
                             10, contextOfLastTurn - 10, 0, 0, 5, 0, contextOfLastTurn, null, null);
         }
     };

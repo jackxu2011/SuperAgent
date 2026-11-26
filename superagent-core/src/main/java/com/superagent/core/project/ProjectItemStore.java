@@ -1,6 +1,7 @@
 package com.superagent.core.project;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /** Which project an agent, task or file is in. Recorded when the item is made (tasks, files) or moved (agents). */
@@ -16,4 +17,7 @@ public interface ProjectItemStore {
 
     /** Ids of the project's items of this kind. */
     List<String> items(ProjectItemKind kind, String projectId);
+
+    /** itemId → projectId for every item of this kind that is in a project (empty project ids omitted). */
+    Map<String, String> projectsOfKind(ProjectItemKind kind);
 }

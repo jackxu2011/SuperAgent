@@ -7,7 +7,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -55,5 +57,16 @@ abstract class AbstractJdbcProjectItemStore implements ProjectItemStore {
     public List<String> items(ProjectItemKind kind, String projectId) {
         return jdbc.query("SELECT item_id FROM project_item" + readFinal() + " WHERE company_id = ? AND kind = ? AND project_id = ? ORDER BY updated_at DESC",
                 (rs, n) -> rs.getString("item_id"), TenantSchema.company(), kind.name(), projectId);
+    }
+
+    @Override
+    public Map<String, String> projectsOfKind(ProjectItemKind kind) {
+        Map<String, String> out = new HashMap<>();
+        jdbc.query("SELECT item_id, project_id FROM project_item" + readFinal()
+                        + " WHERE company_id = ? AND kind = ? AND project_id IS NOT NULL AND project_id <> ''",
+                rs -> {
+                    out.put(rs.getString("item_id"), rs.getString("project_id"));
+                }, TenantSchema.company(), kind.name());
+        return out;
     }
 }

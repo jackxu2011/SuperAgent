@@ -1,6 +1,7 @@
 package com.superagent.core.project;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -53,6 +54,9 @@ public interface ProjectAccess {
 
     /** The project a task was made in. */
     Optional<String> projectOfTask(String taskId);
+
+    /** itemId → projectId for every item of this kind in a project (for bulk analytics; empty when none). */
+    Map<String, String> projectsOfKind(ProjectItemKind kind);
 
     /** Repositories of the project the agent is in (empty when it's in none). */
     List<ProjectRepo> reposOfAgent(String agentId);
