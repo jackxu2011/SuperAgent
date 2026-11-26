@@ -60,6 +60,40 @@ class WorkspaceSnapshotTest {
         assertThat(s.patches.values()).allMatch(p -> p.endsWith("\n"));
     }
 
+    @Test
+    void thePlatformFolderNeverBecomesPartOfTheTasksChangeEvenWhenTheAgentCommittedIt() throws Exception {
+        // A repository that tracks a file under .superagent/ and doesn't ignore the folder.
+        Files.createDirectories(dir.resolve(".superagent/skills/a"));
+        Files.writeString(dir.resolve(".superagent/skills/a/SKILL.md"), "tracked skill\n");
+        HarnessState s = repo();
+        // The run: installing skills wipes the tracked one, the CLI writes its session file; the agent commits it all.
+        Files.delete(dir.resolve(".superagent/skills/a/SKILL.md"));
+        Files.createDirectories(dir.resolve(".superagent/skills/b"));
+        Files.writeString(dir.resolve(".superagent/skills/b/SKILL.md"), "installed\n");
+        Files.writeString(dir.resolve(".superagent/claude-session-1"), "session\n");
+        Files.writeString(dir.resolve("a.txt"), "work\n");
+        git.text(dir, "add", "-A");
+        git.text(dir, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "the agent's own commit");
+        Files.writeString(dir.resolve("a.txt"), "more work\n");
+
+        assertThat(new Workspace(git).commitAll(s, "platform")).isTrue();
+
+        assertThat(git.text(dir, "diff", "--name-only", s.baseSha + "..HEAD")).isEqualTo("a.txt");
+        assertThat(git.text(dir, "status", "--porcelain", "--untracked-files=no")).isEmpty(); // clean for a rebase
+        assertThat(dir.resolve(".superagent/claude-session-1")).exists(); // the CLI still needs it
+        assertThat(dir.resolve(".superagent/skills/b/SKILL.md")).exists();
+    }
+
+    @Test
+    void aRepositoryWithoutThePlatformFolderCommitsAsBefore() throws Exception {
+        HarnessState s = repo();
+        Workspace ws = new Workspace(git);
+        assertThat(ws.commitAll(s, "nothing")).isFalse();
+        Files.writeString(dir.resolve("a.txt"), "changed\n");
+        assertThat(ws.commitAll(s, "work")).isTrue();
+        assertThat(git.text(dir, "diff", "--name-only", s.baseSha + "..HEAD")).isEqualTo("a.txt");
+    }
+
     private HarnessState repo() throws Exception {
         git.text(dir, "init", "-q", "-b", "main");
         Files.writeString(dir.resolve("a.txt"), "a\n");

@@ -22,6 +22,9 @@ final class Workspace {
 
     static final String AGENT_NAME = "SuperAgent";
     static final String AGENT_EMAIL = "agent@superagent.local";
+    /** Where the platform keeps its files in a workspace (CLI sessions, installed skills): never the task's change. */
+    static final String PLATFORM_DIR = ".superagent";
+    private static final String EXCLUDE_PLATFORM = ":(exclude)" + PLATFORM_DIR;
 
     /** One merge at a time into a local branch: the next task rebases onto what the last one merged. */
     private static final Map<String, Object> REPO_LOCKS = new ConcurrentHashMap<>();
@@ -157,15 +160,34 @@ final class Workspace {
 
     // --- recording the work ---
 
-    /** Commits whatever the agent left uncommitted, so the branch holds all of it; false when there was nothing. */
+    /**
+     * Commits whatever the agent left uncommitted, so the branch holds all of it; false when there was nothing.
+     * The platform's own folder is never part of it (see {@link #keepPlatformFolderAsBase}).
+     */
     boolean commitAll(HarnessState s, String message) {
         Path dir = Path.of(s.dir);
-        git.text(dir, "add", "-A");
+        git.text(dir, "add", "-A", "--", ".", EXCLUDE_PLATFORM);
+        keepPlatformFolderAsBase(dir, s.baseSha);
         if (git.git(dir, "diff", "--cached", "--quiet").ok()) {
             return false;
         }
         git.text(dir, "-c", "user.name=" + AGENT_NAME, "-c", "user.email=" + AGENT_EMAIL, "commit", "-q", "-m", message);
         return true;
+    }
+
+    /**
+     * The platform writes into {@code .superagent/} while a task runs: CLI session files, and the run's skills, whose
+     * install replaces the folder and so deletes any file the repository tracks there. A {@code .gitignore} keeps new
+     * files out but not those deletions, and the agent may have committed either itself. So the index gets that
+     * folder back exactly as the base had it, and the next commit takes back whatever earlier commits did there.
+     * The files on disk stay (the CLIs need them); tracked ones are written back, so the worktree stays clean for a
+     * rebase.
+     */
+    private void keepPlatformFolderAsBase(Path dir, String base) {
+        git.text(dir, "reset", "-q", base, "--", PLATFORM_DIR);
+        if (!git.text(dir, "ls-files", "--", PLATFORM_DIR).isEmpty()) {
+            git.text(dir, "checkout", "--", PLATFORM_DIR);
+        }
     }
 
     /** The files changed since the task started, with their line counts, and each one's diff (capped). */
@@ -212,7 +234,7 @@ final class Workspace {
         for (String line : git.text(dir, "status", "--porcelain=v2", "--branch", "--untracked-files=all").lines().toList()) {
             if (line.startsWith("# branch.oid ")) {
                 head = line.substring("# branch.oid ".length()).strip();
-            } else if (!line.startsWith("#") && !line.isBlank() && !entryPath(line).startsWith(".superagent/")) {
+            } else if (!line.startsWith("#") && !line.isBlank() && !entryPath(line).startsWith(PLATFORM_DIR + "/")) {
                 entries.add(line);
             }
         }
@@ -523,7 +545,7 @@ final class Workspace {
         if (!rebasing(s)) {
             return finished(s); // the agent ran it itself
         }
-        git.text(dir, "add", "-A");
+        git.text(dir, "add", "-A", "--", ".", EXCLUDE_PLATFORM);
         boolean empty = git.git(dir, "diff", "--cached", "--quiet").ok();
         Git.Result r = git.git(dir, 600, Map.of("GIT_EDITOR", "true"), "-c", "user.name=" + AGENT_NAME, "-c",
                 "user.email=" + AGENT_EMAIL, "rebase", empty ? "--skip" : "--continue");
