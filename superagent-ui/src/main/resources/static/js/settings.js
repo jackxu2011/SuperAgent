@@ -258,9 +258,10 @@ sel.form.addEventListener("submit", async e => {
   sel.status.textContent = "";
   try {
     const res = await api.updateSettings({
-      agentDefaultModel: sel.agentModel.value || null,
-      companyName: sel.companyName.value.trim() || null,
-      companyShortName: sel.companyShortName.value.trim() || null,
+      // "" clears; null would keep the saved value
+      agentDefaultModel: sel.agentModel.value,
+      companyName: sel.companyName.value.trim(),
+      companyShortName: sel.companyShortName.value.trim(),
       publicUrl: sel.publicUrl.value.trim(), // "" clears it
       backupModels,
       complexMaxSubtasks: Number(sel.complexMaxSubtasks.value) || null,

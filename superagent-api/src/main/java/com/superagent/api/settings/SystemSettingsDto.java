@@ -1,7 +1,8 @@
 package com.superagent.api.settings;
 
 /**
- * Platform-wide defaults that apply to every user; read by everyone, written by admins.
+ * Platform-wide defaults that apply to every user; read by everyone, written by admins. On a save every field follows
+ * the same rule: null (left out) keeps the saved value; for a text field blank clears it.
  *
  * @param agentDefaultModel the model every conversation runs on (the SuperAgent and its background too), and that
  *                          judges which model each task needs; null means the CLI's own default
